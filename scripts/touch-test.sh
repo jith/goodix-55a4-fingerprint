@@ -1,23 +1,20 @@
 #!/usr/bin/env bash
 # Which way of touching gives clear images today? 4 blocks x 5 touches; prints
-# image quality per block. Needs an enrolled print (match results are ignored).
+# image quality per block. Nothing is saved (throwaway enrollment, cancelled).
 set -u
 here="$(cd "$(dirname "$0")" && pwd)"
 echo "== Touch style test (about 3 minutes). Type your password if sudo asks."
 echo "   (If sudo shows a fingerprint prompt first, touch the sensor 3 times to skip it.)"
 sudo -v || exit 1
 since="$(date '+%Y-%m-%d %H:%M:%S')"
-block() {  # name, tuning..., instruction via $msg
+block() {  # name, extra tuning...; instruction in $msg
   local name="$1"; shift
-  bash "$here/tune.sh" GOODIX55X4_VERIFY_GATE=0 GOODIX55X4_VERIFY_VALLEY=0 "$@" >/dev/null || exit 1
+  bash "$here/tune.sh" GOODIX55X4_ENROLL_GATE=0 GOODIX55X4_ENROLL_VALLEY=0 "$@" >/dev/null || exit 1
   sleep 2
   echo
   echo "=== Block $name: $msg"
-  for i in 1 2 3 4 5; do
-    read -r -p "   [$name $i/5] Press Enter, then touch... " _
-    timeout 30 fprintd-verify >/dev/null 2>&1
-    journalctl -u fprintd --since "-40s" --no-pager -o cat | grep "Touch image ridge score" | tail -1 | sed -E 's/.*ridge score ([0-9.]+).*valley depth ([0-9.]+).*/      ridge \1  valley depth \2/'
-  done
+  read -r -p "   Press Enter when ready... " _
+  bash "$here/capture-touches.sh" 5
   echo "MARK block $name" | systemd-cat -t fprint-touch-test
 }
 msg="touch the way you normally do";                                                  block A
