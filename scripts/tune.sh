@@ -4,7 +4,8 @@
 #   scripts/tune.sh --reset                                                 back to built-in defaults
 #   scripts/tune.sh                                                         show current settings
 # Keys: GOODIX55X4_{ENROLL,VERIFY}_GATE (ridge score), GOODIX55X4_{ENROLL,VERIFY}_VALLEY,
-#       GOODIX55X4_{ENROLL,VERIFY}_COHERENCE, GOODIX55X4_MATCH_THRESHOLD, GOODIX55X4_FDT_DELTA
+#       GOODIX55X4_{ENROLL,VERIFY}_COHERENCE, GOODIX55X4_MATCH_THRESHOLD, GOODIX55X4_FDT_DELTA,
+#       GOODIX55X4_TCODE (image sensing time code, factory 0xf0 = 240)
 set -u
 f=/etc/systemd/system/fprintd.service.d/tuning.conf
 if [ $# -eq 0 ]; then
