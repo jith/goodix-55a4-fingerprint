@@ -219,6 +219,7 @@ such touches match neither the enrollment nor each other (log: `valley depth` be
 | after many touches within minutes, normal touch | 0.01 – 0.04 |
 | same session, fingertip wiped dry, **light** touch | 0.04 – 0.10 |
 | same session, fingertip wiped dry, firm press | 0.05 – 0.10 |
+| same session, dry + light, image tcode 0x90 (pkgrel 28 default) | 0.08 – 0.13 (enrollment presses: median 0.23) |
 
 - **Enroll only when conditions are good:** sensor not touched for a while, sensor wiped
   clean (dry microfiber cloth, optionally a drop of isopropyl alcohol, let it dry), hands
@@ -278,7 +279,7 @@ in the display manager's PAM file — at your own risk.
 | Need logs | `./scripts/debug.sh on`, reproduce, `journalctl -u fprintd -b`, then `./scripts/debug.sh off` |
 | Measure accuracy | `./scripts/test-verify.sh 10` (per-touch ridge score, contact %, SIGFM score) |
 | Many "place your finger again" on humid days | the valleys between ridges fill with sweat or get flattened by pressure (log: `valley depth` < 0.10). Wipe the fingertip dry and touch lightly; `./scripts/touch-test.sh` shows which style works |
-| Tune without rebuilding | `./scripts/tune.sh GOODIX55X4_VERIFY_VALLEY=0.06` etc. (keys listed in the script; `--reset` restores defaults). Lowering `GOODIX55X4_MATCH_THRESHOLD` (default 200) raises the risk of other fingers matching |
+| Tune without rebuilding | `./scripts/tune.sh GOODIX55X4_TCODE=96` etc. (keys listed in the script; `--reset` restores defaults; enrollment and verification must use the same tcode). `./scripts/sensor-test.sh` compares tcode values. Lowering `GOODIX55X4_MATCH_THRESHOLD` (default 200) raises the risk of other fingers matching |
 
 ## Uninstall
 
@@ -320,8 +321,12 @@ Windows driver (`Wbdi.dll`):
   "remove finger" after ~15 s); the finger-free reference never follows the base down to a
   finger or lifting level (pkgrel 23 bug that caused retry loops after quick re-touches)
 - 40 enroll stages; match scores printed to the journal (`journalctl -u fprintd | grep SIGFM`)
-- image quality gate on "valley depth" (enroll ≥ 0.10, verify ≥ 0.08): captures whose ridge
+- image quality gate on "valley depth" (enroll and verify ≥ 0.10): captures whose ridge
   valleys are filled by sweat or pressure match neither the template nor each other
+- image sensing time (tcode) set to 3/5 of the OTP-calibrated value (0x90 instead of 0xf0):
+  the factory value overdrives the pixel amplifier with a moist fingertip. Same finger, same
+  evening: 0xf0 gave 0/10 verify matches and an enrollment that needed ~190 presses; 0x90
+  gave a 41/41-press enrollment (median valley depth 0.23) and 9/10 verify matches
 - libfprint's overheat model disabled for this device
 
 Patches 0001, 0002, 0008: earlier host-side finger detection, OpenCV pkg-config
