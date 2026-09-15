@@ -21,8 +21,8 @@ hints=(
 
 cat <<EOF
 == Guided enrollment: $finger for $USER ($stages presses)
- - Press like a keyboard key: firm but NOT hard, about half a second, then lift fully.
-   Very hard presses flatten the ridges; quick light taps are too faint.
+ - Clean, DRY fingertip. Touch LIGHTLY (just cover the sensor) for about half a second,
+   then lift fully. Firm presses and sweaty fingers fill the ridge valleys: unclear images.
  - Wait for the "ok" line before the next press.
  - Follow the placement shown before each press; each spot gets 5 presses.
    Keep most of the sensor covered (don't use only the very tip or edge).
@@ -33,14 +33,16 @@ EOF
 read -r -p "Press Enter to start... " _
 fprintd-delete "$USER" >/dev/null 2>&1
 
-n=0
+n=-1   # fprintd reports the duplicate-check press as a stage too
 faint=0
 echo ">> Press 0 (duplicate check): anywhere"
 stdbuf -oL fprintd-enroll -f "$finger" 2>&1 | while IFS= read -r line; do
   case "$line" in
     *enroll-stage-passed*)
       n=$((n + 1)); faint=0
-      if [ $n -lt $stages ]; then
+      if [ $n -eq 0 ]; then
+        echo "   duplicate check done; press 1: ${hints[0]}"
+      elif [ $n -lt $stages ]; then
         echo "   ok $n/$stages   next: ${hints[$(( n / 5 % ${#hints[@]} ))]}"
       fi ;;
     *enroll-retry-scan*|*enroll-swipe-too-short*|*enroll-finger-not-centered*)
@@ -55,7 +57,7 @@ stdbuf -oL fprintd-enroll -f "$finger" 2>&1 | while IFS= read -r line; do
     *enroll-completed*)
       echo "== Enrollment completed ($stages presses)" ;;
     *"Enrolling "*)
-      echo ">> then press 1: ${hints[0]}" ;;
+      : ;;
     *)
       echo "   $line" ;;
   esac
