@@ -1,50 +1,91 @@
 #!/usr/bin/env bash
 # Guided enrollment for the ThinkPad E14 (20RA) Goodix 27c6:55a4 reader.
-#   scripts/enroll.sh [finger]   default: right-index-finger
+#   scripts/enroll.sh [finger]         new enrollment (replaces your prints), default right-index-finger
+#   scripts/enroll.sh --add [label]    add 40 more presses of the SAME finger as a second print,
+#                                      keeping the existing one (more coverage of natural touches)
 #
 # The sensor sees only ~5x4 mm of the finger per press, and a later touch matches
-# only if it overlaps an enrolled press. So the 40 presses are spread over the
-# whole fingertip; the script tells you where to place the finger next.
+# only if it overlaps an enrolled press, so more presses of the way you actually
+# touch the sensor means fewer "Failed to match" on clear touches.
 set -u
-finger="${1:-right-index-finger}"
 stages=40
-hints=(
-  "CENTRE of the fingertip, flat"
-  "slightly towards the TIP (~2 mm)"
-  "slightly towards the first JOINT (~2 mm)"
-  "slightly LEFT"
-  "slightly RIGHT"
-  "CENTRE, finger rotated slightly LEFT"
-  "CENTRE, finger rotated slightly RIGHT"
-  "the way you naturally touch it for sudo / unlock"
-)
+add=0
+if [ "${1:-}" = "--add" ]; then
+  add=1
+  shift
+fi
+
+if [ $add -eq 1 ]; then
+  # fprintd stores one print per finger name; the second print of the same
+  # finger needs an unused name (verification checks all of your prints).
+  enrolled="$(fprintd-list "$USER" 2>/dev/null)"
+  finger="${1:-}"
+  if [ -z "$finger" ]; then
+    for f in right-middle-finger right-ring-finger right-little-finger right-thumb \
+             left-index-finger left-middle-finger left-ring-finger left-little-finger left-thumb; do
+      grep -q -- "$f" <<<"$enrolled" || { finger="$f"; break; }
+    done
+  fi
+  [ -n "$finger" ] || { echo "no free finger name left"; exit 1; }
+  hints=(
+    "your NATURAL touch, exactly as for sudo / unlock"
+    "natural touch, slightly more to the LEFT"
+    "natural touch, slightly more to the RIGHT"
+    "natural touch, slightly towards the TIP"
+    "natural touch, slightly LOWER (towards the joint)"
+    "natural touch, finger slightly rotated"
+    "natural touch, finger a bit flatter"
+    "your NATURAL touch again"
+  )
+  first_press="use a DIFFERENT finger (e.g. your thumb) for this first press"
+else
+  finger="${1:-right-index-finger}"
+  hints=(
+    "CENTRE of the fingertip, flat"
+    "slightly towards the TIP (~2 mm)"
+    "slightly towards the first JOINT (~2 mm)"
+    "slightly LEFT"
+    "slightly RIGHT"
+    "CENTRE, finger rotated slightly LEFT"
+    "CENTRE, finger rotated slightly RIGHT"
+    "the way you naturally touch it for sudo / unlock"
+  )
+  first_press="any finger, any placement"
+fi
 
 cat <<EOF
-== Guided enrollment: $finger for $USER ($stages presses)
+== Guided enrollment ($stages presses) for $USER, stored as: $finger
  - Clean, DRY fingertip. Touch LIGHTLY (just cover the sensor) for about half a second,
    then lift fully. Firm presses and sweaty fingers fill the ridge valleys: unclear images.
  - Wait for the "ok" line before the next press.
- - Follow the placement shown before each press; each spot gets 5 presses.
-   Keep most of the sensor covered (don't use only the very tip or edge).
- - "too faint" = press again at the same spot. "lift" = remove the finger first.
- - The very first press only checks for an existing print (any placement).
-This replaces existing prints of $USER.
+ - Follow the placement shown before each press; each placement gets 5 presses.
+ - "unclear" = press again (lighter, fingertip dry). "lift" = remove the finger first.
+ - The first press only checks for an existing print: $first_press.
 EOF
+if [ $add -eq 1 ]; then
+  echo "This ADDS a second print of your right index finger (stored under the name above);"
+  echo "all other presses use your right index finger."
+else
+  echo "This replaces existing prints of $USER."
+fi
 read -r -p "Press Enter to start... " _
-fprintd-delete "$USER" >/dev/null 2>&1
+[ $add -eq 1 ] || fprintd-delete "$USER" >/dev/null 2>&1
 
 n=-1   # fprintd reports the duplicate-check press as a stage too
 faint=0
-echo ">> Press 0 (duplicate check): anywhere"
+echo ">> Press 0 (duplicate check): $first_press"
 stdbuf -oL fprintd-enroll -f "$finger" 2>&1 | while IFS= read -r line; do
   case "$line" in
     *enroll-stage-passed*)
       n=$((n + 1)); faint=0
       if [ $n -eq 0 ]; then
-        echo "   duplicate check done; press 1: ${hints[0]}"
+        echo "   duplicate check done; press 1 (right index): ${hints[0]}"
       elif [ $n -lt $stages ]; then
         echo "   ok $n/$stages   next: ${hints[$(( n / 5 % ${#hints[@]} ))]}"
       fi ;;
+    *enroll-duplicate*)
+      echo "   the first press matched your existing print: run the script again and use a"
+      echo "   DIFFERENT finger (e.g. thumb) for the first press only" ;;
     *enroll-retry-scan*|*enroll-swipe-too-short*|*enroll-finger-not-centered*)
       faint=$((faint + 1))
       if [ $faint -ge 3 ]; then

@@ -203,7 +203,12 @@ fingers still rejected.
 - **Press like a keyboard key: firm but not hard, about half a second, then lift fully.**
   Very hard presses flatten the ridges; quick light taps are too faint.
 - "too light" → press again at the same spot. "lift" → remove the finger first.
-- Re-enroll after updating from a package older than pkgrel 24 (it used 20 presses).
+- Re-enroll after updating from a package older than pkgrel 28 (different image settings).
+- Clear touches that still fail to match (log: `valley depth` ≥ 0.10 but low `SIGFM` score) are
+  placements the enrollment doesn't cover. Add a second print of the same finger made of
+  natural touches: `./scripts/enroll.sh --add` (use a different finger, e.g. the thumb, for the
+  first press only: fprintd refuses to enroll a finger it already recognises). sudo and the
+  lock screen then check both prints.
 
 Check: `fprintd-verify`
 
