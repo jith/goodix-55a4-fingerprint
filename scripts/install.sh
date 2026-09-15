@@ -2,7 +2,7 @@
 # Install the patched libfprint for the ThinkPad E14 (20RA) Goodix 27c6:55a4 reader.
 #   scripts/install.sh            prebuilt package if compatible, otherwise build from source
 #   scripts/install.sh --binary   force the prebuilt package (refuses if libraries are missing)
-#   scripts/install.sh --source   build from the pinned sources in driver/ (offline)
+#   scripts/install.sh --source   build from the pinned sources in driver/ (offline), then install
 set -u
 source "$(dirname "$0")/common.sh"
 need_pacman
@@ -17,33 +17,33 @@ esac
 
 bash "$REPO_DIR/scripts/check-compat.sh"; compat=$?
 [ $compat -eq 1 ] && exit 1
-if [ "$mode" = "auto" ]; then
-  [ $compat -eq 0 ] && mode="binary" || mode="source"
+# The prebuilt package must be the build of the current driver/PKGBUILD.
+want="$(cd "$REPO_DIR/driver" && bash -c 'source PKGBUILD; echo "${epoch}_${pkgver}-${pkgrel}"')"
+if [ -n "$PKG_FILE" ] && [[ "$(basename "$PKG_FILE")" != *"-${want}-x86_64.pkg.tar.zst" ]]; then
+  yellow "prebuilt package $(basename "$PKG_FILE") is older than driver/PKGBUILD ($want)"
+  [ "$mode" = "binary" ] && { red "Run: $0 --source"; exit 1; }
+  PKG_FILE=""
 fi
-if [ "$mode" = "binary" ] && [ $compat -ne 0 ]; then
-  red "Refusing to install the prebuilt package: system libraries differ. Run: $0 --source"
+if [ "$mode" = "auto" ]; then
+  [ $compat -eq 0 ] && [ -n "$PKG_FILE" ] && mode="binary" || mode="source"
+fi
+if [ "$mode" = "binary" ] && { [ $compat -ne 0 ] || [ -z "$PKG_FILE" ]; }; then
+  red "Refusing to install the prebuilt package (missing, or system libraries differ). Run: $0 --source"
   exit 1
 fi
 
 sudo -v || exit 1
 sudo pacman -S --needed --noconfirm fprintd usbutils || exit 1
 
-if [ "$mode" = "binary" ]; then
-  pkg="$PKG_FILE"
-  echo "== Installing prebuilt package"
-else
+if [ "$mode" = "source" ]; then
   echo "== Building from pinned sources (offline)"
-  work="$(mktemp -d)"
-  trap 'rm -rf "$work"' EXIT
-  cp "$REPO_DIR/driver/PKGBUILD" "$REPO_DIR"/driver/patches/*.patch "$REPO_DIR"/driver/upstream/*.tar.xz "$work/"
-  sudo pacman -S --needed --asdeps --noconfirm base-devel $BUILD_DEPS || exit 1
-  (cd "$work" && makepkg -fsc --noconfirm) || { red "build failed"; exit 1; }
-  pkg="$(ls "$work"/${PKG_NAME}-*.pkg.tar.zst | head -1)"
+  bash "$REPO_DIR/scripts/build-package.sh" || exit 1
+  source "$REPO_DIR/scripts/common.sh"   # pick up the freshly built package
 fi
+echo "== Installing $(basename "$PKG_FILE")"
 
-# pacman replaces the stock libfprint (declared conflict) and keeps the old files
-# restorable via scripts/uninstall.sh. --ask 4 auto-confirms that replacement.
-sudo pacman -U --noconfirm --ask 4 "$pkg" || { red "pacman -U failed"; exit 1; }
+# pacman replaces the stock libfprint (declared conflict); --ask 4 confirms that.
+sudo pacman -U --noconfirm --ask 4 "$PKG_FILE" || { red "pacman -U failed"; exit 1; }
 
 # Pacman hook: after updates of linked libraries (opencv, glib2, openssl, libgusb)
 # warn if libfprint no longer loads. Login/sudo always fall back to the password.

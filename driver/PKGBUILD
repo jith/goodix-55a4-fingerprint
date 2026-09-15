@@ -12,7 +12,7 @@ pkgdesc="libfprint for Goodix 27c6:55a4 (ThinkPad E14 20RA) on universal firmwar
 # epoch keeps it newer than the AUR libfprint-goodixtls-55x4 package
 epoch=1
 pkgver=r1805.c1937b9
-pkgrel=23
+pkgrel=24
 arch=('x86_64')
 license=("LGPL-2.1-or-later")
 makedepends=("meson" "pkgconf" "gobject-introspection" "gtk-doc" "doctest" "glib2-devel")
@@ -29,7 +29,7 @@ sha256sums=('56065bce8636147abe7f0a8da2019c815be9d92f297efa9381a0096d3d3a47c5'
             '3a1dc72a0981a0894975c50c51bbdd97023d449d4fdaa70d523703c5db928ee8'
             'a57b8923143b1dfaa28efdfb641c547e5b86c736d65d0448416ceec6af7e3e4d'
             '9f4e685e9074a78c7ac703a7153edd7b60811ca414e6d1fb454e859dab3cf759'
-            '33a20d08c94fd8f7b0f5b34ce73a9bee76a219e6fc6c577caefe0a7f0af991d1')
+            'a57989d113fb71cf76ea78acb33af0a3bd8a04ec88acac8158402aac94775f9d')
 
 prepare() {
     cd "${srcdir}/${_pkgbase}"

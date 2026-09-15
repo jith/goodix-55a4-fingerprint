@@ -59,7 +59,8 @@ firmware/
 scripts/
   check-compat.sh              can the prebuilt binary run on this system?
   install.sh                   install (prebuilt if compatible, else build from source)
-  enroll.sh                    enroll a finger with the right technique
+  build-package.sh             build driver/ offline into packages/ (updates needed-libs, checksums)
+  enroll.sh                    guided 40-press enrollment (tells you where to place the finger)
   enable-sudo.sh               fingerprint for sudo only (--disable to undo)
   debug.sh on|off              verbose logs + raw capture dumps
   uninstall.sh                 back to stock libfprint
@@ -188,12 +189,16 @@ missing, and installs the pacman hook.
 ./scripts/enroll.sh left-index-finger
 ```
 
-Technique matters on this small sensor:
+The sensor sees only ~5×4 mm of the finger per press, and a later touch matches only if
+it overlaps one of the enrolled presses. The script therefore takes **40 presses** and
+tells you where to put the finger before each one (centre, tip, lower part, left/right
+edge, slightly rotated, natural touch). In offline tests on labelled touches, 21 enrolled
+frames matched 58% of genuine touches, 36 frames with varied placement 90%, with other
+fingers still rejected.
 
-- **Press firmly for about half a second, then lift fully.** Quick light taps give poor images.
-- Shift the finger slightly between presses (centre, tip, left, right).
-- `enroll-retry-scan` → press was too light, press again.
-- `enroll-remove-and-retry` → lift first, then press again.
+- **Press firmly for about half a second, then lift fully.** Quick light taps are rejected.
+- "too light" → press again at the same spot. "lift" → remove the finger first.
+- Re-enroll after updating from a package older than pkgrel 24 (it used 20 presses).
 
 Check: `fprintd-verify`
 
@@ -243,7 +248,7 @@ in the display manager's PAM file — at your own risk.
 | `Invalid device firmware` / `Invalid device PSK` in `journalctl -u fprintd` | reader not on 10062 or re-paired by Windows → flash firmware (step 1) |
 | Many `retry-scan` | press firmer and longer; wait ~1 s between presses |
 | `remove-and-retry` loops | finger rests on the sensor; lift fully |
-| Matches rarely | re-enroll with firm presses and varied placement |
+| Matches rarely | `journalctl -u fprintd -b \| grep SIGFM` shows scores; re-enroll with `scripts/enroll.sh` following the placement hints |
 | Need logs | `./scripts/debug.sh on`, reproduce, `journalctl -u fprintd -b`, then `./scripts/debug.sh off` |
 
 ## Uninstall
@@ -281,7 +286,11 @@ Windows driver (`Wbdi.dll`):
 - raw 12-bit processing: background subtraction, row destriping, local contrast
   normalisation, contact mask; SIGFM matcher, score threshold 200, 20 enroll stages
 - quality gate (ridge score: enroll ≥ 34, verify ≥ 30) reported as libfprint retry
-  messages; finger still on sensor → "remove finger"; no persisted state files
+  messages; no persisted state files
+- finger resting on the sensor: never arms (waits for the lift, silently during verify,
+  "remove finger" after ~15 s); the finger-free reference never follows the base down to a
+  finger or lifting level (pkgrel 23 bug that caused retry loops after quick re-touches)
+- 40 enroll stages; match scores printed to the journal (`journalctl -u fprintd | grep SIGFM`)
 - libfprint's overheat model disabled for this device
 
 Patches 0001, 0002, 0008: earlier host-side finger detection, OpenCV pkg-config
