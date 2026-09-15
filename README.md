@@ -11,6 +11,10 @@ for **sudo** and a **lock screen** (e.g. noctalia), reproducibly and offline:
 Tested: ThinkPad E14 Gen 1, machine type **20RA**, CachyOS (Arch based), fprintd 1.94.5,
 package `libfprint-goodixtls-55x4-fixed 1:r1805.c1937b9-23`, September 2026.
 
+> ⚠️ **Unofficial, reverse-engineered, tested on a single laptop.** Flashing the reader
+> firmware can brick it and breaks Windows fingerprint login. Read [Risks](#risks) before
+> doing anything.
+
 ## Is this for my machine?
 
 | Check | Expected |
@@ -62,6 +66,65 @@ scripts/
 pacman-hook/                   post-update check that the library still loads
 ```
 
+## Risks
+
+Read this before flashing or installing. You use everything here at your own risk;
+none of it is supported by Lenovo, Goodix or the libfprint project.
+
+### Firmware flashing (highest risk)
+
+- **Can permanently brick the reader.** Power loss, suspend, lid close or a USB reset during
+  the flash, or a failed write, can leave the reader unusable. There is no official recovery.
+  The tool checks the firmware SHA-256, requires the `MILAN_RTSEC_IAP_10027` bootloader and
+  asks for a confirmation code, but cannot rule this out.
+- **No tested way back to factory firmware.** The factory image (`GF3208_RTSEC_APP_10039`)
+  is not in this repo, and the included `10041` file is *not* factory firmware.
+- **Windows fingerprint login stops working.** Flashing writes a Linux pairing key; Windows
+  enrollments become invalid. If Windows or Lenovo Vantage later re-flashes or re-pairs the
+  reader, Linux stops working until you flash again.
+- **Only one path was actually run:** 10041 → 10062 on one 20RA. Flashing from the factory
+  10039 firmware, or on another laptop model, is untested.
+
+### Driver
+
+- **Loose firmware check.** The driver accepts any `GF32xx_RTSEC_APP_100xx` firmware name.
+  A Windows-paired reader stops with `Invalid device PSK`, but on `10041` (or another version
+  paired with the Linux key) the driver runs its capture flow **without any error** even though
+  it was only tested on `10062`: expect failed or unreliable matching. Always confirm `_10062`
+  in `journalctl -u fprintd` (step 1).
+- **Tuned on one unit.** Thresholds (finger-detect base levels, image quality gates) come from
+  this 20RA's sensor. Another unit of the same model may need different values.
+- **Old libfprint fork.** It replaces the distro `libfprint` with an old fork
+  (TheWeirdDev `55b4-experimental`, based on libfprint 1.94.6 from August 2023, with build
+  fixes up to August 2026); bug and security fixes from newer upstream libfprint
+  are not included, for this reader or any other.
+- **Prebuilt binary can stop loading** after distro library updates (e.g. OpenCV soname
+  change). The fingerprint then stops working until rebuilt; see
+  [Safety of the prebuilt binary](#safety-of-the-prebuilt-binary).
+- **Overheat protection disabled.** libfprint's activity-time overheat model is turned off for
+  this device (it aborted normal enrolls). The reader waits in low-power finger-detect mode and
+  only captures on touch; no heating was observed, but long-term behaviour is untested.
+
+### Security
+
+- **Fingerprint unlocks sudo without the password.** Anyone who can put an enrolled finger on
+  the reader (including while you sleep) gets root via sudo, and the lock screen opens the same way.
+  There is no liveness or anti-spoofing detection.
+- **Modest matcher.** Small 108×88 px sensor with the SIGFM matcher (threshold 200). In testing,
+  other fingers of the same person scored up to ~150 and genuine touches usually 250–2400;
+  the false-accept rate against other people was never measured.
+- **Publicly known pairing key.** Linux talks to the reader over TLS with the all-zero PSK from
+  goodix-fp-dump (Windows uses a per-device secret). Someone with physical USB access could
+  impersonate the reader or replay images.
+- **Biometric data on disk.** Enrolled prints are stored unencrypted (root-only) in
+  `/var/lib/fprint`, as with any fprintd setup. `scripts/debug.sh on` additionally saves raw
+  fingerprint images to `/var/lib/fprint/debug`; `scripts/debug.sh off` deletes them.
+
+### Legal
+
+- The firmware binaries are Goodix/Lenovo property and not redistributable. Keep this
+  repository private.
+
 ## Installation
 
 ```bash
@@ -97,7 +160,8 @@ If it shows anything other than `_10062` (e.g. `_10039`, `_10041`), or errors
 `Invalid device PSK` / `Invalid device firmware`, flash once:
 
 ```bash
-# AC power connected, do not suspend or close the lid during the flash
+# AC power connected, do not suspend or close the lid during the flash.
+# Can brick the reader and breaks Windows fingerprint login: see Risks.
 ./firmware/flash-firmware.sh
 ```
 
