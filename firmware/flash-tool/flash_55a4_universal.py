@@ -34,7 +34,7 @@ def main():
         raise SystemExit(f"Firmware hash mismatch ({sha}); refusing to flash.")
     print(f"Firmware file OK: {FW_PATH} (matches Lenovo r16gf09w)")
 
-    print("\nThis will erase the current sensor firmware (GF3268_RTSEC_APP_10041)")
+    print("\nThis will erase the current sensor firmware (factory 10039 or community 10041)")
     print("and write Lenovo's universal GF32x8_RTSEC_APP_10062.")
     print("Do NOT suspend, close the lid, or unplug power while it runs.")
     code = str(random.randint(1000, 9999))

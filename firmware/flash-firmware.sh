@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # One-time: flash Lenovo's universal Goodix firmware GF32x8_RTSEC_APP_10062
-# onto the ThinkPad E14 (20RA) 27c6:55a4 reader. Needed only if the reader
-# still runs the factory GF3268_RTSEC_APP_10041 firmware (see README).
+# onto the ThinkPad E14 (20RA) 27c6:55a4 reader. Needed when the reader is not
+# on 10062: factory GF3208_RTSEC_APP_10039, community GF3268_RTSEC_APP_10041,
+# or after Windows re-paired it (see README).
 # RISK: interrupting the flash can leave the reader unusable. Plug in AC power.
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"

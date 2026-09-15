@@ -49,7 +49,7 @@ packages/
   SHA256SUMS
 firmware/
   GF3208_RTSEC_APP_10062.bin   Lenovo universal firmware (from Lenovo driver r16gf09w)
-  GF3268_RTSEC_APP_10041.bin   factory firmware of this reader (rollback reference)
+  GF3268_RTSEC_APP_10041.bin   community Linux firmware this reader ran before 10062 (reference only, not factory)
   flash-firmware.sh            one-time flash (wraps flash-tool/, from goodix-fp-dump, MIT)
   SHA256SUMS
 scripts/
@@ -70,8 +70,21 @@ cd ~/thinkpad-e14-20ra-goodix-55a4-fingerprint
 
 ### 1. Check the firmware (one time)
 
-The driver requires firmware **GF32x8_RTSEC_APP_10062**. The factory firmware
-(`GF3268_RTSEC_APP_10041`) does not work with it.
+The driver requires firmware **GF32xx_RTSEC_APP_10062** (Lenovo universal firmware).
+
+| Firmware | Where it comes from | Works with this driver? |
+|---|---|---|
+| `GF3208_RTSEC_APP_10039` | **factory (stock)**, paired with Windows | ❌ no: the reader's pairing key (PSK) is set by Windows and unknown to Linux, so the TLS session cannot be opened (`Invalid device PSK`) |
+| `GF3268_RTSEC_APP_10041` | community goodix-fp-dump firmware (what the upstream Linux 55x4 driver targets) | ❌ not supported: a GF3268 build on this GF3208 chip; washed-out images, taps did not match (tested 12–14 Sep 2026); the new capture flow was never tested on it |
+| `GF32xx_RTSEC_APP_10062` | Lenovo Windows driver r16gf09w (universal) | ✅ tested, working |
+
+History of the tested 20RA: factory 10039 → flashed 10041 (goodix-fp-dump) → flashed 10062.
+The flash tool accepts any `GF32xx_RTSEC_APP_100xx` start point (it erases the app,
+writes 10062 through the MILAN IAP bootloader and writes the Linux pairing key); only the
+10041 → 10062 path was run on this machine.
+
+**Dual boot:** after flashing, Windows fingerprint login stops working, and if Windows or
+Lenovo Vantage re-flashes/re-pairs the reader, Linux stops working until you flash again.
 
 Easiest check: install the driver (step 2), run `fprintd-verify` once, then:
 
@@ -80,7 +93,8 @@ journalctl -u fprintd -b | grep -m1 "Device firmware"
 # Device firmware: "GF3268_RTSEC_APP_10062"   <- OK (the prefix GF3208/3258/3268 may vary)
 ```
 
-If it shows `..._10041` or the error `Invalid device firmware`, flash once:
+If it shows anything other than `_10062` (e.g. `_10039`, `_10041`), or errors
+`Invalid device PSK` / `Invalid device firmware`, flash once:
 
 ```bash
 # AC power connected, do not suspend or close the lid during the flash
@@ -162,7 +176,7 @@ in the display manager's PAM file — at your own risk.
 | Symptom | Action |
 |---|---|
 | `No devices available` | `lsusb -d 27c6:55a4`; after suspend the reader re-enumerates, `sudo systemctl restart fprintd` |
-| `Invalid device firmware` in `journalctl -u fprintd` | flash firmware (step 1) |
+| `Invalid device firmware` / `Invalid device PSK` in `journalctl -u fprintd` | reader not on 10062 or re-paired by Windows → flash firmware (step 1) |
 | Many `retry-scan` | press firmer and longer; wait ~1 s between presses |
 | `remove-and-retry` loops | finger rests on the sensor; lift fully |
 | Matches rarely | re-enroll with firm presses and varied placement |
