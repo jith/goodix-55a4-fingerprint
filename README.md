@@ -206,6 +206,28 @@ fingers still rejected.
 
 Check: `fprintd-verify`
 
+### Getting clear images (important on this sensor)
+
+The reader measures the tiny air gaps (valleys) between the ridges of your finger. When
+they fill with sweat or get flattened by pressure, the image loses the fingerprint:
+such touches match neither the enrollment nor each other (log: `valley depth` below
+0.10). Measured on the tested 20RA:
+
+| Touch | Valley depth |
+|---|---|
+| after a break, normal touch (Sep 14) | 0.105 – 0.25 (clear) |
+| after many touches within minutes, normal touch | 0.01 – 0.04 |
+| same session, fingertip wiped dry, **light** touch | 0.04 – 0.10 |
+| same session, fingertip wiped dry, firm press | 0.05 – 0.10 |
+
+- **Enroll only when conditions are good:** sensor not touched for a while, sensor wiped
+  clean (dry microfiber cloth, optionally a drop of isopropyl alcohol, let it dry), hands
+  washed and fully dried. Touch **lightly**, just enough to cover the sensor. The driver
+  rejects unclear presses during enrollment (`valley depth` ≥ 0.10).
+- **Daily use:** a single light touch with a dry fingertip. After a failed attempt, wipe
+  the fingertip and wait a second instead of tapping repeatedly; rapid retries make the
+  images worse.
+
 ### 4. Use it
 
 **sudo** (not login):
