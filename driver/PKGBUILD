@@ -12,7 +12,7 @@ pkgdesc="libfprint for Goodix 27c6:55a4 (ThinkPad E14 20RA) on universal firmwar
 # epoch keeps it newer than the AUR libfprint-goodixtls-55x4 package
 epoch=1
 pkgver=r1805.c1937b9
-pkgrel=28
+pkgrel=29
 arch=('x86_64')
 license=("LGPL-2.1-or-later")
 makedepends=("meson" "pkgconf" "gobject-introspection" "gtk-doc" "doctest" "glib2-devel")
@@ -24,12 +24,14 @@ source=("libfprint-TheWeirdDev-55b4-experimental-${_commit}.tar.xz"
         "0001-goodix55x4-host-side-finger-detect.patch"
         "0002-sigfm-opencv-pkgconfig-fallback.patch"
         "0008-sigfm-tuned-matcher-clahe-mutual.patch"
-        "0010-goodix55x4-windows-fdt-flow-10062.patch")
+        "0010-goodix55x4-windows-fdt-flow-10062.patch"
+        "0011-image-device-clean-enroll-completion.patch")
 sha256sums=('56065bce8636147abe7f0a8da2019c815be9d92f297efa9381a0096d3d3a47c5'
             '3a1dc72a0981a0894975c50c51bbdd97023d449d4fdaa70d523703c5db928ee8'
             'a57b8923143b1dfaa28efdfb641c547e5b86c736d65d0448416ceec6af7e3e4d'
             '9f4e685e9074a78c7ac703a7153edd7b60811ca414e6d1fb454e859dab3cf759'
-            'a5f81a85442e369182a92c5c79c147e0a435f1ed4e0f2196d8922b8678d44512')
+            'a5f81a85442e369182a92c5c79c147e0a435f1ed4e0f2196d8922b8678d44512'
+            'a4c29abdcb4281754aec9021f8e37b9d002e1d073dbd36be4d2c2556276dc8b2')
 
 prepare() {
     cd "${srcdir}/${_pkgbase}"
@@ -37,6 +39,7 @@ prepare() {
     patch -Np1 -i "${srcdir}/0002-sigfm-opencv-pkgconfig-fallback.patch"
     patch -Np1 -i "${srcdir}/0008-sigfm-tuned-matcher-clahe-mutual.patch"
     patch -Np1 -i "${srcdir}/0010-goodix55x4-windows-fdt-flow-10062.patch"
+    patch -Np1 -i "${srcdir}/0011-image-device-clean-enroll-completion.patch"
 }
 
 build() {

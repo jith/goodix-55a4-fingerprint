@@ -46,7 +46,7 @@ Requirements: `pacman`, `fprintd`, x86_64, `opencv` (5.x or 4.x), `openssl` 3, `
 ```
 driver/
   PKGBUILD                     offline, checksum-pinned package recipe
-  patches/0001..0010-*.patch   changes on top of upstream (0010 = the 55a4 capture flow)
+  patches/0001..0011-*.patch   changes on top of upstream (0010 = the 55a4 capture flow)
   upstream/*.tar.xz            snapshot of TheWeirdDev/libfprint, branch 55b4-experimental, commit c1937b9
 packages/
   libfprint-goodixtls-55x4-fixed-…-23-x86_64.pkg.tar.zst   tested prebuilt package
@@ -334,6 +334,14 @@ Windows driver (`Wbdi.dll`):
   evening: 0xf0 gave 0/10 verify matches and an enrollment that needed ~190 presses; 0x90
   gave a 41/41-press enrollment (median valley depth 0.23) and 9/10 verify matches
 - libfprint's overheat model disabled for this device
+
+Patch 0011 (libfprint core) removes the two warnings logged at the end of every enrollment:
+
+- after the last stage the device is deactivated once the finger is lifted, not while it is
+  still on the sensor ("Deactivating image device while it is not idle")
+- `fp_print_serialize()` freed its list of SIGFM blobs with `g_clear_object()`, which failed
+  with "g_object_unref: assertion 'G_IS_OBJECT (object)' failed" and leaked the list every
+  time fprintd saved a print
 
 Patches 0001, 0002, 0008: earlier host-side finger detection, OpenCV pkg-config
 fallback, SIGFM matcher tuning.
