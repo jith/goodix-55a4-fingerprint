@@ -1,0 +1,3 @@
+*.bin binary
+*.zst binary
+*.xz binary

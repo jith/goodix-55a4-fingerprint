@@ -1,0 +1,50 @@
+# Patched libfprint for the Goodix 27c6:55a4 fingerprint reader
+# (Lenovo ThinkPad E14 Gen 1 / 20RA) running Lenovo universal firmware 10062.
+#
+# Builds fully offline: upstream source is a pinned snapshot in ../driver/upstream
+# (TheWeirdDev/libfprint, branch 55b4-experimental, commit c1937b9), so a later
+# upstream change can never break the patches.
+
+pkgname="libfprint-goodixtls-55x4-fixed"
+_pkgbase="libfprint-goodixtls-55x4"
+_commit="c1937b9"
+pkgdesc="libfprint for Goodix 27c6:55a4 (ThinkPad E14 20RA) on universal firmware 10062: Windows-driver capture flow, OTP-calibrated config, tuned SIGFM matcher"
+# epoch keeps it newer than the AUR libfprint-goodixtls-55x4 package
+epoch=1
+pkgver=r1805.c1937b9
+pkgrel=23
+arch=('x86_64')
+license=("LGPL-2.1-or-later")
+makedepends=("meson" "pkgconf" "gobject-introspection" "gtk-doc" "doctest" "glib2-devel")
+provides=("libfprint" "libfprint-2.so=2-64" "${_pkgbase}")
+conflicts=("libfprint" "${_pkgbase}")
+depends=('libgusb' 'openssl' 'pixman' 'nss' 'libgudev' 'opencv')
+optdepends=('fprintd: D-Bus daemon for managing readers')
+source=("libfprint-TheWeirdDev-55b4-experimental-${_commit}.tar.xz"
+        "0001-goodix55x4-host-side-finger-detect.patch"
+        "0002-sigfm-opencv-pkgconfig-fallback.patch"
+        "0008-sigfm-tuned-matcher-clahe-mutual.patch"
+        "0010-goodix55x4-windows-fdt-flow-10062.patch")
+sha256sums=('56065bce8636147abe7f0a8da2019c815be9d92f297efa9381a0096d3d3a47c5'
+            '3a1dc72a0981a0894975c50c51bbdd97023d449d4fdaa70d523703c5db928ee8'
+            'a57b8923143b1dfaa28efdfb641c547e5b86c736d65d0448416ceec6af7e3e4d'
+            '9f4e685e9074a78c7ac703a7153edd7b60811ca414e6d1fb454e859dab3cf759'
+            '33a20d08c94fd8f7b0f5b34ce73a9bee76a219e6fc6c577caefe0a7f0af991d1')
+
+prepare() {
+    cd "${srcdir}/${_pkgbase}"
+    patch -Np1 -i "${srcdir}/0001-goodix55x4-host-side-finger-detect.patch"
+    patch -Np1 -i "${srcdir}/0002-sigfm-opencv-pkgconfig-fallback.patch"
+    patch -Np1 -i "${srcdir}/0008-sigfm-tuned-matcher-clahe-mutual.patch"
+    patch -Np1 -i "${srcdir}/0010-goodix55x4-windows-fdt-flow-10062.patch"
+}
+
+build() {
+    # Same options as the tested prebuilt package in ../packages
+    meson setup build "${srcdir}/${_pkgbase}" --prefix=/usr --buildtype=release -D doc=false
+    meson compile -C build
+}
+
+package() {
+    meson install -C build --destdir="${pkgdir}"
+}

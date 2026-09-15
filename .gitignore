@@ -1,0 +1,4 @@
+firmware/flash-tool/.venv/
+firmware/flash-tool/__pycache__/
+firmware/flash-tool/flash-test-images/
+firmware/flash-tool/*.pgm

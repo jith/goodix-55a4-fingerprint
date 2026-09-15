@@ -1,0 +1,15 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = opencv
+Target = glib2
+Target = openssl
+Target = libgusb
+Target = libfprint-goodixtls-55x4-fixed
+Target = fprintd
+
+[Action]
+Description = Checking patched libfprint (Goodix 55a4) still loads...
+When = PostTransaction
+Exec = /usr/local/libexec/thinkpad-e14-goodix-55a4-libfprint-check.sh
