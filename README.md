@@ -49,7 +49,7 @@ driver/
   patches/0001..0011-*.patch   changes on top of upstream (0010 = the 55a4 capture flow)
   upstream/*.tar.xz            snapshot of TheWeirdDev/libfprint, branch 55b4-experimental, commit c1937b9
 packages/
-  libfprint-goodixtls-55x4-fixed-…-23-x86_64.pkg.tar.zst   tested prebuilt package
+  libfprint-goodixtls-55x4-fixed-…-29-x86_64.pkg.tar.zst   tested prebuilt package
   needed-libs.txt              exact shared libraries the binary links against
   SHA256SUMS
 firmware/
