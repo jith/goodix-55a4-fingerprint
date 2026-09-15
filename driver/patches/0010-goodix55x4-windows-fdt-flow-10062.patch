@@ -1,4 +1,4 @@
-From c17c544bd853ec9cc7e4bcc808138268cd968d79 Mon Sep 17 00:00:00 2001
+From 2e69f6589ff1c668d2715f42ff2a2c919301784d Mon Sep 17 00:00:00 2001
 From: local <local@localhost>
 Date: Mon, 14 Sep 2026 15:35:20 +0530
 Subject: [PATCH] goodix55x4: Windows-style FDT capture flow for universal
@@ -6,10 +6,10 @@ Subject: [PATCH] goodix55x4: Windows-style FDT capture flow for universal
 
 ---
  libfprint/drivers/goodixtls/goodix.c     |  12 +-
- libfprint/drivers/goodixtls/goodix55x4.c | 865 +++++++++++++++++------
+ libfprint/drivers/goodixtls/goodix55x4.c | 900 +++++++++++++++++------
  libfprint/fpi-print.c                    |   9 +-
  libfprint/sigfm/sigfm.cpp                |  15 +-
- 4 files changed, 689 insertions(+), 212 deletions(-)
+ 4 files changed, 724 insertions(+), 212 deletions(-)
 
 diff --git a/libfprint/drivers/goodixtls/goodix.c b/libfprint/drivers/goodixtls/goodix.c
 index 417a37c..3575a18 100644
@@ -41,10 +41,10 @@ index 417a37c..3575a18 100644
  
  static void
 diff --git a/libfprint/drivers/goodixtls/goodix55x4.c b/libfprint/drivers/goodixtls/goodix55x4.c
-index 636b6e1..31e00a2 100644
+index 636b6e1..7f9a52b 100644
 --- a/libfprint/drivers/goodixtls/goodix55x4.c
 +++ b/libfprint/drivers/goodixtls/goodix55x4.c
-@@ -53,17 +53,50 @@
+@@ -53,17 +53,60 @@
    (GOODIX55X4_HEIGHT * GOODIX55X4_SCAN_WIDTH) / 4 * 6
  #define GOODIX55X4_CAP_FRAMES 1 // Number of frames we capture per swipe
  
@@ -79,6 +79,16 @@ index 636b6e1..31e00a2 100644
 +// retrying silently. Verify captures below ~30 matched < 10% of the time.
 +#define GOODIX55X4_MIN_RIDGE_ENROLL 34.0
 +#define GOODIX55X4_MIN_RIDGE_VERIFY 30.0
++// Tuning without rebuilding: fprintd service environment variables
++// GOODIX55X4_ENROLL_GATE, GOODIX55X4_VERIFY_GATE, GOODIX55X4_MATCH_THRESHOLD.
++static double env_double(const char *name, double fallback) {
++  const char *v = g_getenv(name);
++  if (!v || !*v)
++    return fallback;
++  gchar *end = NULL;
++  double d = g_ascii_strtod(v, &end);
++  return (end && *end == '\0' && d >= 0 && d < 100000) ? d : fallback;
++}
 +// Let a lifted finger clear the sensor before re-reading the FDT base.
 +#define GOODIX55X4_SETTLE_MS 250
 +// FDT base (sum of the 12 area readings): finger-free ~4200-4450 on this
@@ -106,7 +116,7 @@ index 636b6e1..31e00a2 100644
  
  typedef unsigned short Goodix55X4Pix;
  
-@@ -73,7 +106,22 @@ struct _FpiDeviceGoodixTls55X4 {
+@@ -73,7 +116,22 @@ struct _FpiDeviceGoodixTls55X4 {
    guint8 *otp;
  
    GSList *frames;
@@ -130,7 +140,7 @@ index 636b6e1..31e00a2 100644
  
    Goodix55X4Pix empty_img[GOODIX55X4_FRAME_SIZE];
  };
-@@ -96,6 +144,7 @@ enum activate_states {
+@@ -96,6 +154,7 @@ enum activate_states {
    ACTIVATE_CHECK_PSK,
    ACTIVATE_RESET,
    ACTIVATE_SET_MCU_IDLE,
@@ -138,7 +148,7 @@ index 636b6e1..31e00a2 100644
    ACTIVATE_SET_MCU_CONFIG,
    ACTIVATE_NUM_STATES,
  };
-@@ -109,6 +158,73 @@ static void check_none(FpDevice *dev, gpointer user_data, GError *error) {
+@@ -109,6 +168,73 @@ static void check_none(FpDevice *dev, gpointer user_data, GError *error) {
    fpi_ssm_next_state(user_data);
  }
  
@@ -212,7 +222,7 @@ index 636b6e1..31e00a2 100644
  static void check_firmware_version(FpDevice *dev, gchar *firmware,
                                     gpointer user_data, GError *error) {
    if (error) {
-@@ -119,7 +235,9 @@ static void check_firmware_version(FpDevice *dev, gchar *firmware,
+@@ -119,7 +245,9 @@ static void check_firmware_version(FpDevice *dev, gchar *firmware,
    fp_dbg("Device firmware: \"%s\"", firmware);
    g_print("%s\n", firmware);
  
@@ -223,7 +233,7 @@ index 636b6e1..31e00a2 100644
      g_set_error(&error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
                  "Invalid device firmware: \"%s\"", firmware);
      fpi_ssm_mark_failed(user_data, error);
-@@ -302,15 +420,16 @@ static void activate_run_state(FpiSsm *ssm, FpDevice *dev) {
+@@ -302,15 +430,16 @@ static void activate_run_state(FpiSsm *ssm, FpDevice *dev) {
      goodix_send_mcu_switch_to_idle_mode(dev, 20, check_idle, ssm);
      break;
  
@@ -247,7 +257,7 @@ index 636b6e1..31e00a2 100644
      break;
  
      // case ACTIVATE_SET_POWERDOWN_SCAN_FREQUENCY:
-@@ -352,16 +471,13 @@ static void activate_complete(FpiSsm *ssm, FpDevice *dev, GError *error) {
+@@ -352,16 +481,13 @@ static void activate_complete(FpiSsm *ssm, FpDevice *dev, GError *error) {
  // ---- SCAN SECTION START ----
  
  enum SCAN_STAGES {
@@ -270,7 +280,7 @@ index 636b6e1..31e00a2 100644
    SCAN_STAGE_NUM,
  };
  
-@@ -493,107 +609,465 @@ postprocess_frame(Goodix55X4Pix frame[GOODIX55X4_FRAME_SIZE],
+@@ -493,107 +619,489 @@ postprocess_frame(Goodix55X4Pix frame[GOODIX55X4_FRAME_SIZE],
    return sum != 0;
  }
  
@@ -325,8 +335,7 @@ index 636b6e1..31e00a2 100644
 +  float fa = *(const float *)a, fb = *(const float *)b;
 +  return (fa > fb) - (fa < fb);
 +}
- 
--} frame_processing_info;
++
 +static float percentile(const float *v, int n, double pct) {
 +  float *c = g_memdup2(v, n * sizeof(float));
 +  qsort(c, n, sizeof(float), cmp_float);
@@ -336,7 +345,8 @@ index 636b6e1..31e00a2 100644
 +  g_free(c);
 +  return res;
 +}
-+
+ 
+-} frame_processing_info;
 +// Turn a raw 12-bit capture into the 8-bit image given to the matcher.
 +// Tuned offline on labelled raw captures (index vs middle/thumb):
 +//  1. signed background difference (contact lowers the reading);
@@ -437,14 +447,19 @@ index 636b6e1..31e00a2 100644
 -  fpi_ssm_jump_to_state(ssm, SCAN_STAGE_SWITCH_TO_FDT_MODE);
 +// Ridge detail: band-pass (3x3 minus 7x7 box blur) of the background-
 +// subtracted frame with each row's mean removed (sensor stripe pattern).
-+static double frame_ridge_score(Goodix55X4Pix frame[GOODIX55X4_FRAME_SIZE],
-+                                Goodix55X4Pix background[GOODIX55X4_FRAME_SIZE]) {
++// Optionally also reports the touched share of the sensor (contact lowers
++// readings by ~900 counts) and the ridge contrast inside the touched area, to
++// tell a partial touch from a washed-out one.
++#define GOODIX55X4_CONTACT_COUNTS 300
++static double frame_ridge_score_ex(Goodix55X4Pix frame[GOODIX55X4_FRAME_SIZE],
++                                   Goodix55X4Pix background[GOODIX55X4_FRAME_SIZE],
++                                   double *contact_share, double *contact_ridge) {
 +  const int w = GOODIX55X4_WIDTH, h = GOODIX55X4_HEIGHT, margin = 4;
 +  double *sub = g_new(double, GOODIX55X4_FRAME_SIZE);
 +  double *fine = g_new(double, GOODIX55X4_FRAME_SIZE);
 +  double *coarse = g_new(double, GOODIX55X4_FRAME_SIZE);
-+  double sum_sq = 0;
-+  int count = 0;
++  double sum_sq = 0, touched_sq = 0;
++  int count = 0, touched = 0;
 +
 +  for (int i = 0; i < GOODIX55X4_FRAME_SIZE; i++)
 +    sub[i] = (double)background[i] - (double)frame[i];
@@ -459,11 +474,19 @@ index 636b6e1..31e00a2 100644
 +      double v = fine[y * w + x] - coarse[y * w + x] - mean;
 +      sum_sq += v * v;
 +      count++;
++      if (coarse[y * w + x] > GOODIX55X4_CONTACT_COUNTS) {
++        touched_sq += v * v;
++        touched++;
++      }
 +    }
 +  }
 +  g_free(sub);
 +  g_free(fine);
 +  g_free(coarse);
++  if (contact_share)
++    *contact_share = (double)touched / count;
++  if (contact_ridge)
++    *contact_ridge = touched ? sqrt(touched_sq / touched) : 0;
 +  return sqrt(sum_sq / count);
  }
  
@@ -472,6 +495,11 @@ index 636b6e1..31e00a2 100644
 -  g_print("SCAN_ON_READ_IMG\n");
 -  if (err) {
 -    fpi_ssm_mark_failed(ssm, err);
++static double frame_ridge_score(Goodix55X4Pix frame[GOODIX55X4_FRAME_SIZE],
++                                Goodix55X4Pix background[GOODIX55X4_FRAME_SIZE]) {
++  return frame_ridge_score_ex(frame, background, NULL, NULL);
++}
++
 +static void debug_dump(FpImage *img) {
 +  static guint counter = 0;
 +  if (!g_file_test(GOODIX55X4_DEBUG_DIR, G_FILE_TEST_IS_DIR))
@@ -514,10 +542,10 @@ index 636b6e1..31e00a2 100644
 +  for (int i = 0; i < GOODIX55X4_FDT_AREAS; i++) {
 +    p[2 + 2 * i] = words[i] & 0xFF;
 +    p[3 + 2 * i] = words[i] >> 8;
-+  }
+   }
 +  return p;
 +}
-+
+ 
 +static void parse_fdt_words(guint16 *out, const guint8 *data, guint16 len) {
 +  const guint8 *vals = data + len - GOODIX55X4_FDT_LEN;
 +  for (int i = 0; i < GOODIX55X4_FDT_AREAS; i++)
@@ -525,11 +553,13 @@ index 636b6e1..31e00a2 100644
 +}
 +
 +static void on_settled(FpDevice *dev, gpointer ssm) {
-+  FpiDeviceGoodixTls55X4 *self = FPI_DEVICE_GOODIXTLS55X4(dev);
+   FpiDeviceGoodixTls55X4 *self = FPI_DEVICE_GOODIXTLS55X4(dev);
 +  self->settle_source = NULL;
 +  fpi_ssm_jump_to_state(ssm, self->settle_state);
 +}
-+
+ 
+-  Goodix55X4Pix candidate[GOODIX55X4_FRAME_SIZE];
+-  decode_frame(candidate, data);
 +// Delayed state change that deactivation can cancel.
 +static void jump_after_settle(FpDevice *dev, FpiSsm *ssm, int state) {
 +  FpiDeviceGoodixTls55X4 *self = FPI_DEVICE_GOODIXTLS55X4(dev);
@@ -541,7 +571,9 @@ index 636b6e1..31e00a2 100644
 +  self->settle_source =
 +      fpi_device_add_timeout(dev, GOODIX55X4_SETTLE_MS, on_settled, ssm, NULL);
 +}
-+
+ 
+-  double diff = frame_diff_score(candidate, self->empty_img);
+-  g_print("Finger-detect poll: diff vs background = %.1f\n", diff);
 +// A reply that arrives after deactivation started must not drive the scan
 +// any further (the device may already be asleep or closed).
 +static gboolean scan_stopped(FpDevice *dev, FpiSsm *ssm) {
@@ -550,7 +582,11 @@ index 636b6e1..31e00a2 100644
 +  fpi_ssm_mark_completed(ssm);
 +  return TRUE;
 +}
-+
+ 
+-  if (diff < GOODIX55X4_FINGER_DETECT_DIFF_THRESHOLD) {
+-    if (++self->poll_attempts >= GOODIX55X4_FINGER_DETECT_MAX_ATTEMPTS) {
+-      fpi_ssm_mark_failed(ssm,
+-                         fpi_device_retry_new(FP_DEVICE_RETRY_GENERAL));
 +// Ask the user to touch again (shown by pam_fprintd, noctalia, fprintd-enroll)
 +// rather than retrying silently. Enroll stays active and continues at
 +// enroll_state once the finger is off; verify ends and fprintd restarts it.
@@ -565,7 +601,7 @@ index 636b6e1..31e00a2 100644
 +  } else {
 +    fpi_ssm_mark_completed(ssm);
 +    fpi_image_device_retry_scan(img_dev, retry);
-   }
++  }
 +}
 +
 +static guint32 fdt_sum(FpiDeviceGoodixTls55X4 *self) {
@@ -574,10 +610,10 @@ index 636b6e1..31e00a2 100644
 +    sum += self->fdt_vals[i];
 +  return sum;
 +}
- 
++
 +static gboolean fdt_read_ok(FpDevice *dev, FpiSsm *ssm, guint8 *data,
 +                            guint16 len, GError *err) {
-   FpiDeviceGoodixTls55X4 *self = FPI_DEVICE_GOODIXTLS55X4(dev);
++  FpiDeviceGoodixTls55X4 *self = FPI_DEVICE_GOODIXTLS55X4(dev);
 +  if (err) {
 +    fpi_ssm_mark_failed(ssm, err);
 +    return FALSE;
@@ -592,24 +628,16 @@ index 636b6e1..31e00a2 100644
 +  parse_fdt_words(self->fdt_vals, data, len);
 +  return TRUE;
 +}
- 
--  Goodix55X4Pix candidate[GOODIX55X4_FRAME_SIZE];
--  decode_frame(candidate, data);
++
 +static gboolean base_is_finger(FpiDeviceGoodixTls55X4 *self, guint32 sum) {
 +  guint32 ref = self->base_max ? self->base_max : GOODIX55X4_BASE_TYPICAL;
 +  return sum * 100 < ref * GOODIX55X4_BASE_FINGER_PERCENT;
 +}
- 
--  double diff = frame_diff_score(candidate, self->empty_img);
--  g_print("Finger-detect poll: diff vs background = %.1f\n", diff);
++
 +static gboolean base_is_drift(guint32 sum) {
 +  return sum * 100 >= GOODIX55X4_BASE_TYPICAL * GOODIX55X4_BASE_DRIFT_PERCENT;
 +}
- 
--  if (diff < GOODIX55X4_FINGER_DETECT_DIFF_THRESHOLD) {
--    if (++self->poll_attempts >= GOODIX55X4_FINGER_DETECT_MAX_ATTEMPTS) {
--      fpi_ssm_mark_failed(ssm,
--                         fpi_device_retry_new(FP_DEVICE_RETRY_GENERAL));
++
 +static void on_fdt_manual(FpDevice *dev, guint8 *data, guint16 len,
 +                          gpointer ssm, GError *err) {
 +  FpiDeviceGoodixTls55X4 *self = FPI_DEVICE_GOODIXTLS55X4(dev);
@@ -766,12 +794,18 @@ index 636b6e1..31e00a2 100644
 +  Goodix55X4Pix raw[GOODIX55X4_FRAME_SIZE];
 +  decode_frame(raw, data);
 +  FpiDeviceAction action = fpi_device_get_current_action(dev);
-+  double gate = action == FPI_DEVICE_ACTION_ENROLL   ? GOODIX55X4_MIN_RIDGE_ENROLL
-+                : action == FPI_DEVICE_ACTION_VERIFY ? GOODIX55X4_MIN_RIDGE_VERIFY
-+                                                     : 0;
-+  double ridge = frame_ridge_score(raw, self->empty_img);
-+  g_print("Touch image ridge score %.1f (gate %.0f, FDT base %u)\n", ridge,
-+          gate, self->base_sum);
++  double gate =
++      action == FPI_DEVICE_ACTION_ENROLL
++          ? env_double("GOODIX55X4_ENROLL_GATE", GOODIX55X4_MIN_RIDGE_ENROLL)
++      : action == FPI_DEVICE_ACTION_VERIFY
++          ? env_double("GOODIX55X4_VERIFY_GATE", GOODIX55X4_MIN_RIDGE_VERIFY)
++          : 0;
++  double contact = 0, contact_ridge = 0;
++  double ridge = frame_ridge_score_ex(raw, self->empty_img, &contact, &contact_ridge);
++  g_print("Touch image ridge score %.1f (gate %.0f, FDT base %u, contact %.0f%%, "
++          "ridge in contact %.1f, touch flag 0x%x)\n",
++          ridge, gate, self->base_sum, contact * 100, contact_ridge,
++          self->event_touch_flag);
 +  debug_dump_raw(raw, self->empty_img, ridge, self->base_sum, ridge >= gate);
 +
 +  if (ridge < gate) {
@@ -805,7 +839,7 @@ index 636b6e1..31e00a2 100644
  }
  
  gboolean save_image_to_pgm2(guchar *data, const char *path) {
-@@ -654,113 +1128,71 @@ gboolean save_image_to_pgm(FpImage *img, const char *path) {
+@@ -654,113 +1162,71 @@ gboolean save_image_to_pgm(FpImage *img, const char *path) {
    return TRUE;
  }
  
@@ -971,7 +1005,7 @@ index 636b6e1..31e00a2 100644
      fpi_image_device_report_finger_status(img_dev, FALSE);
      break;
    }
-@@ -792,18 +1224,16 @@ static void sleep_run_state(FpiSsm *ssm, FpDevice *dev) {
+@@ -792,18 +1258,16 @@ static void sleep_run_state(FpiSsm *ssm, FpDevice *dev) {
    }  
  }
  
@@ -997,7 +1031,7 @@ index 636b6e1..31e00a2 100644
      return;
    }
    g_print("finished scan!");
-@@ -820,9 +1250,11 @@ static void sleep_complete(FpiSsm *ssm, FpDevice *dev, GError *error) {
+@@ -820,9 +1284,11 @@ static void sleep_complete(FpiSsm *ssm, FpDevice *dev, GError *error) {
  }
  
  static void scan_start(FpiDeviceGoodixTls55X4 *dev) {
@@ -1012,7 +1046,7 @@ index 636b6e1..31e00a2 100644
  }
  
  static void sleep_start(FpDevice *dev, gpointer user_data) {
-@@ -860,6 +1292,7 @@ static void dev_deinit(FpImageDevice *img_dev) {
+@@ -860,6 +1326,7 @@ static void dev_deinit(FpImageDevice *img_dev) {
  
  static void dev_activate(FpImageDevice *img_dev) {
    FpDevice *dev = FP_DEVICE(img_dev);
@@ -1020,7 +1054,7 @@ index 636b6e1..31e00a2 100644
  
    fpi_ssm_start(fpi_ssm_new(dev, activate_run_state, ACTIVATE_NUM_STATES),
                  activate_complete);
-@@ -881,6 +1314,14 @@ static void dev_change_state(FpImageDevice *img_dev,
+@@ -881,6 +1348,14 @@ static void dev_change_state(FpImageDevice *img_dev,
  
  static void dev_deactivate(FpImageDevice *img_dev) {
    FpDevice *dev = FP_DEVICE(img_dev);
@@ -1035,7 +1069,7 @@ index 636b6e1..31e00a2 100644
    fpi_device_add_timeout(dev, 250, sleep_start, NULL, NULL);
  }
  
-@@ -888,6 +1329,11 @@ static void dev_deactivate(FpImageDevice *img_dev) {
+@@ -888,6 +1363,11 @@ static void dev_deactivate(FpImageDevice *img_dev) {
  
  static void fpi_device_goodixtls55x4_init(FpiDeviceGoodixTls55X4 *self) {
    self->frames = g_slist_alloc();
@@ -1047,7 +1081,7 @@ index 636b6e1..31e00a2 100644
  }
  
  static void
-@@ -904,11 +1350,18 @@ fpi_device_goodixtls55x4_class_init(FpiDeviceGoodixTls55X4Class *class) {
+@@ -904,11 +1384,19 @@ fpi_device_goodixtls55x4_class_init(FpiDeviceGoodixTls55X4Class *class) {
    dev_class->full_name = "Goodix TLS Fingerprint Sensor 55X4";
    dev_class->type = FP_DEVICE_TYPE_USB;
    dev_class->id_table = id_table;
@@ -1064,7 +1098,8 @@ index 636b6e1..31e00a2 100644
  
    // TODO
 -  img_dev_class->bz3_threshold = 150; // tuned SIGFM (mutual matching) score scale
-+  img_dev_class->bz3_threshold = 200; // labelled raw data: other fingers <= 81, own finger mostly > 400
++  // labelled raw data: other fingers <= 163, own finger mostly > 400
++  img_dev_class->bz3_threshold = (gint)env_double("GOODIX55X4_MATCH_THRESHOLD", 200);
    img_dev_class->algorithm = FPI_DEVICE_ALGO_SIGFM;
    img_dev_class->img_width = GOODIX55X4_WIDTH;
    img_dev_class->img_height = GOODIX55X4_HEIGHT;

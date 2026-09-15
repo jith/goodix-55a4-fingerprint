@@ -61,6 +61,7 @@ scripts/
   install.sh                   install (prebuilt if compatible, else build from source)
   build-package.sh             build driver/ offline into packages/ (updates needed-libs, checksums)
   enroll.sh                    guided 40-press enrollment (tells you where to place the finger)
+  test-verify.sh [N]           N deliberate verify attempts + image quality / match score summary
   enable-sudo.sh               fingerprint for sudo only (--disable to undo)
   debug.sh on|off              verbose logs + raw capture dumps
   uninstall.sh                 back to stock libfprint
@@ -196,7 +197,8 @@ edge, slightly rotated, natural touch). In offline tests on labelled touches, 21
 frames matched 58% of genuine touches, 36 frames with varied placement 90%, with other
 fingers still rejected.
 
-- **Press firmly for about half a second, then lift fully.** Quick light taps are rejected.
+- **Press like a keyboard key: firm but not hard, about half a second, then lift fully.**
+  Very hard presses flatten the ridges; quick light taps are too faint.
 - "too light" → press again at the same spot. "lift" → remove the finger first.
 - Re-enroll after updating from a package older than pkgrel 24 (it used 20 presses).
 
@@ -250,6 +252,8 @@ in the display manager's PAM file — at your own risk.
 | `remove-and-retry` loops | finger rests on the sensor; lift fully |
 | Matches rarely | `journalctl -u fprintd -b \| grep SIGFM` shows scores; re-enroll with `scripts/enroll.sh` following the placement hints |
 | Need logs | `./scripts/debug.sh on`, reproduce, `journalctl -u fprintd -b`, then `./scripts/debug.sh off` |
+| Measure accuracy | `./scripts/test-verify.sh 10` (per-touch ridge score, contact %, SIGFM score) |
+| Tune without rebuilding | systemd drop-in for fprintd with `Environment=GOODIX55X4_VERIFY_GATE=…`, `GOODIX55X4_ENROLL_GATE=…`, `GOODIX55X4_MATCH_THRESHOLD=…` (defaults 30, 34, 200); lowering the match threshold raises the risk of other fingers matching |
 
 ## Uninstall
 

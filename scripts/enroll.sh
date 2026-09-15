@@ -10,10 +10,10 @@ finger="${1:-right-index-finger}"
 stages=40
 hints=(
   "CENTRE of the fingertip, flat"
-  "TIP: slide the finger down so the upper part touches"
-  "LOWER part: towards the first joint"
-  "LEFT edge of the fingertip"
-  "RIGHT edge of the fingertip"
+  "slightly towards the TIP (~2 mm)"
+  "slightly towards the first JOINT (~2 mm)"
+  "slightly LEFT"
+  "slightly RIGHT"
   "CENTRE, finger rotated slightly LEFT"
   "CENTRE, finger rotated slightly RIGHT"
   "the way you naturally touch it for sudo / unlock"
@@ -21,9 +21,12 @@ hints=(
 
 cat <<EOF
 == Guided enrollment: $finger for $USER ($stages presses)
- - Press FIRMLY for about half a second, then lift fully. Quick light taps are rejected.
+ - Press like a keyboard key: firm but NOT hard, about half a second, then lift fully.
+   Very hard presses flatten the ridges; quick light taps are too faint.
+ - Wait for the "ok" line before the next press.
  - Follow the placement shown before each press; each spot gets 5 presses.
- - "too light" = press again at the same spot. "lift" = remove the finger first.
+   Keep most of the sensor covered (don't use only the very tip or edge).
+ - "too faint" = press again at the same spot. "lift" = remove the finger first.
  - The very first press only checks for an existing print (any placement).
 This replaces existing prints of $USER.
 EOF
@@ -40,7 +43,7 @@ stdbuf -oL fprintd-enroll -f "$finger" 2>&1 | while IFS= read -r line; do
         echo "   ok $n/$stages   next: ${hints[$(( n / 5 % ${#hints[@]} ))]}"
       fi ;;
     *enroll-retry-scan*|*enroll-swipe-too-short*|*enroll-finger-not-centered*)
-      echo "   too light, press again (same spot)" ;;
+      echo "   image too faint: press again at the same spot (not too hard, not too light)" ;;
     *enroll-remove-and-retry*)
       echo "   lift your finger fully, then press again" ;;
     *enroll-completed*)
