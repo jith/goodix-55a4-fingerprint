@@ -9,7 +9,8 @@ for **sudo** and a **lock screen** (e.g. noctalia), reproducibly and offline:
 - a pacman hook that warns if a system update breaks the binary
 
 Tested: ThinkPad E14 Gen 1, machine type **20RA**, CachyOS (Arch based), fprintd 1.94.5,
-package `libfprint-goodixtls-55x4-fixed 1:r1805.c1937b9-23`, September 2026.
+package `libfprint-goodixtls-55x4-fixed 1:r1805.c1937b9-28`, September 2026
+(40-press enrollment in 2 minutes, 9/10 verify matches, lock screen and sudo first-touch matches).
 
 > ⚠️ **Unofficial, reverse-engineered, tested on a single laptop.** Flashing the reader
 > firmware can brick it and breaks Windows fingerprint login. Read [Risks](#risks) before
