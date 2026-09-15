@@ -62,6 +62,8 @@ scripts/
   build-package.sh             build driver/ offline into packages/ (updates needed-libs, checksums)
   enroll.sh                    guided 40-press enrollment (tells you where to place the finger)
   test-verify.sh [N]           N deliberate verify attempts + image quality / match score summary
+  touch-test.sh                which touch style gives clear images (4 blocks x 5 touches)
+  tune.sh KEY=VALUE | --reset  driver thresholds without rebuilding (fprintd environment)
   enable-sudo.sh               fingerprint for sudo only (--disable to undo)
   debug.sh on|off              verbose logs + raw capture dumps
   uninstall.sh                 back to stock libfprint
@@ -253,7 +255,8 @@ in the display manager's PAM file — at your own risk.
 | Matches rarely | `journalctl -u fprintd -b \| grep SIGFM` shows scores; re-enroll with `scripts/enroll.sh` following the placement hints |
 | Need logs | `./scripts/debug.sh on`, reproduce, `journalctl -u fprintd -b`, then `./scripts/debug.sh off` |
 | Measure accuracy | `./scripts/test-verify.sh 10` (per-touch ridge score, contact %, SIGFM score) |
-| Tune without rebuilding | systemd drop-in for fprintd with `Environment=GOODIX55X4_VERIFY_GATE=…`, `GOODIX55X4_ENROLL_GATE=…`, `GOODIX55X4_MATCH_THRESHOLD=…` (defaults 30, 34, 200); lowering the match threshold raises the risk of other fingers matching |
+| Many "place your finger again" on humid days | the valleys between ridges fill with sweat or get flattened by pressure (log: `valley depth` < 0.10). Wipe the fingertip dry and touch lightly; `./scripts/touch-test.sh` shows which style works |
+| Tune without rebuilding | `./scripts/tune.sh GOODIX55X4_VERIFY_VALLEY=0.06` etc. (keys listed in the script; `--reset` restores defaults). Lowering `GOODIX55X4_MATCH_THRESHOLD` (default 200) raises the risk of other fingers matching |
 
 ## Uninstall
 
@@ -295,6 +298,8 @@ Windows driver (`Wbdi.dll`):
   "remove finger" after ~15 s); the finger-free reference never follows the base down to a
   finger or lifting level (pkgrel 23 bug that caused retry loops after quick re-touches)
 - 40 enroll stages; match scores printed to the journal (`journalctl -u fprintd | grep SIGFM`)
+- image quality gate on "valley depth" (enroll ≥ 0.10, verify ≥ 0.08): captures whose ridge
+  valleys are filled by sweat or pressure match neither the template nor each other
 - libfprint's overheat model disabled for this device
 
 Patches 0001, 0002, 0008: earlier host-side finger detection, OpenCV pkg-config

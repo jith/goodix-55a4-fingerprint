@@ -34,16 +34,22 @@ read -r -p "Press Enter to start... " _
 fprintd-delete "$USER" >/dev/null 2>&1
 
 n=0
+faint=0
 echo ">> Press 0 (duplicate check): anywhere"
 stdbuf -oL fprintd-enroll -f "$finger" 2>&1 | while IFS= read -r line; do
   case "$line" in
     *enroll-stage-passed*)
-      n=$((n + 1))
+      n=$((n + 1)); faint=0
       if [ $n -lt $stages ]; then
         echo "   ok $n/$stages   next: ${hints[$(( n / 5 % ${#hints[@]} ))]}"
       fi ;;
     *enroll-retry-scan*|*enroll-swipe-too-short*|*enroll-finger-not-centered*)
-      echo "   image too faint: press again at the same spot (not too hard, not too light)" ;;
+      faint=$((faint + 1))
+      if [ $faint -ge 3 ]; then
+        echo "   image unclear again: wipe your fingertip DRY on a cloth and touch more LIGHTLY"; faint=0
+      else
+        echo "   image unclear: press again at the same spot (lighter, fingertip dry)"
+      fi ;;
     *enroll-remove-and-retry*)
       echo "   lift your finger fully, then press again" ;;
     *enroll-completed*)
