@@ -66,7 +66,9 @@ scripts/
   touch-test.sh                which touch style gives clear images (4 blocks x 5 touches)
   tune.sh KEY=VALUE | --reset  driver thresholds without rebuilding (fprintd environment)
   enable-sudo.sh               fingerprint for sudo only (--disable to undo)
-  debug.sh on|off              verbose logs + raw capture dumps
+  debug.sh images|on|off       save raw captures (images), + verbose logs (on), both off
+  collect-labelled.sh          labelled touches of several fingers (matcher development data)
+  export-data.sh               copy saved captures + fprintd journal to ~/fprint-data
   uninstall.sh                 back to stock libfprint
 pacman-hook/                   post-update check that the library still loads
 ```

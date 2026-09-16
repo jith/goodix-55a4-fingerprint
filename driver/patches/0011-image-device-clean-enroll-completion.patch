@@ -1,4 +1,4 @@
-From bfd5260501dd2039fc40a90496fe904715664df4 Mon Sep 17 00:00:00 2001
+From 1c8e7b2e771e59a3f27c9dbcb8eafa2df68dc13c Mon Sep 17 00:00:00 2001
 From: Sreejith Krishnan <1450973+jith@users.noreply.github.com>
 Date: Tue, 15 Sep 2026 22:54:11 +0530
 Subject: [PATCH] image-device, print: clean enrollment completion

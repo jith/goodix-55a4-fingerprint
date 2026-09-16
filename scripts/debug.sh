@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Verbose fprintd logging + raw capture dumps for troubleshooting.
-#   scripts/debug.sh on    enable   (logs: journalctl -u fprintd; dumps: /var/lib/fprint/debug)
-#   scripts/debug.sh off   disable and delete dumps
+# Troubleshooting switches.
+#   scripts/debug.sh images  save every capture (raw sensor frames) to /var/lib/fprint/debug
+#   scripts/debug.sh on      images + verbose fprintd logging (journalctl -u fprintd)
+#   scripts/debug.sh off     both off; deletes the saved captures (export them first:
+#                            scripts/export-data.sh)
 set -u
 case "${1:-}" in
+  images)
+    sudo mkdir -p /var/lib/fprint/debug && echo "saving captures to /var/lib/fprint/debug" ;;
   on)
     sudo sh -c '
       mkdir -p /etc/systemd/system/fprintd.service.d /var/lib/fprint/debug
@@ -15,5 +19,5 @@ case "${1:-}" in
       rmdir /etc/systemd/system/fprintd.service.d 2>/dev/null
       rm -rf /var/lib/fprint/debug
       systemctl daemon-reload; systemctl restart fprintd' && echo "debug off" ;;
-  *) echo "usage: $0 on|off"; exit 1 ;;
+  *) echo "usage: $0 images|on|off"; exit 1 ;;
 esac
