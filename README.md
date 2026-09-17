@@ -242,9 +242,16 @@ such touches match neither the enrollment nor each other (log: `valley depth` be
 **sudo** (not login):
 
 ```bash
-./scripts/enable-sudo.sh          # adds 'auth sufficient pam_fprintd.so' to /etc/pam.d/sudo
+./scripts/enable-sudo.sh          # 'auth sufficient pam_fprintd.so max-tries=2 timeout=10' in /etc/pam.d/sudo
 ./scripts/enable-sudo.sh --disable
+TIMEOUT=15 MAX_TRIES=3 ./scripts/enable-sudo.sh   # other limits
 ```
+
+In a terminal sudo cannot take the password while the fingerprint check waits. The
+defaults of pam_fprintd (30 s, 3 tries) made failed attempts feel stuck, because
+"place your finger again" prompts for unclear touches don't count as tries; the script
+therefore gives up after 10 s or 2 failed matches. (The noctalia lock screen accepts the
+password while the fingerprint check runs, so it is not affected.)
 
 `sufficient` means the password prompt still appears if the fingerprint fails or the
 reader is unavailable — you cannot lock yourself out.
